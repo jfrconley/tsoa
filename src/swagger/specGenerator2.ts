@@ -1,5 +1,6 @@
 import { Tsoa } from '../metadataGeneration/tsoa';
 import { assertNever } from '../utils/assertNever';
+import { isVoidType } from '../utils/isVoidType';
 import { SwaggerConfig } from './../config';
 import { convertColonPathParams, normalisePath } from './../utils/pathUtils';
 import { SpecGenerator } from './specGenerator';
@@ -92,6 +93,7 @@ export class SpecGenerator2 extends SpecGenerator {
         };
       } else if (referenceType.dataType === 'refAlias') {
         const swaggerType = this.getSwaggerType(referenceType.type);
+        const format = referenceType.format as Swagger.DataFormat;
         const validators = Object.keys(referenceType.validators)
           .filter(key => {
             return !key.startsWith('is') && key !== 'minDate' && key !== 'maxDate';
@@ -107,6 +109,7 @@ export class SpecGenerator2 extends SpecGenerator {
           ...(swaggerType as Swagger.Schema),
           default: referenceType.default || swaggerType.default,
           example: referenceType.example,
+          format: format || swaggerType.format,
           description: referenceType.description,
           ...validators,
         };
@@ -177,7 +180,7 @@ export class SpecGenerator2 extends SpecGenerator {
       swaggerResponses[res.name] = {
         description: res.description,
       };
-      if (res.schema && res.schema.dataType !== 'void') {
+      if (res.schema && !isVoidType(res.schema)) {
         swaggerResponses[res.name].schema = this.getSwaggerType(res.schema);
       }
       if (res.examples) {

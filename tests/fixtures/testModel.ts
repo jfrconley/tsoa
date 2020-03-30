@@ -173,6 +173,7 @@ type ThreeOrFour = TypeAliasModel3 | TypeAlias4;
 /**
  * A Word shall be a non-empty sting
  * @minLength 1
+ * @format password
  */
 type Word = string;
 
@@ -563,12 +564,19 @@ export class PrivateModel {
   }
 }
 
+enum MyEnum {
+  OK,
+  KO,
+}
+
 /**
  * This is a description of TestClassModel
  */
 export class TestClassModel extends TestClassBaseModel {
   public account: Account;
   public defaultValue2 = 'Default Value 2';
+  public enumKeys: keyof typeof MyEnum;
+  public keyInterface?: keyof Model;
   /**
    * This is a description of a public string property
    *
