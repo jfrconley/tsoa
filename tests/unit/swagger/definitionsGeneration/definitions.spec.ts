@@ -1,17 +1,18 @@
 import { expect } from 'chai';
 import 'mocha';
-import { SwaggerConfig } from '../../../../src/config';
 import { MetadataGenerator } from '../../../../src/metadataGeneration/metadataGenerator';
 import { SpecGenerator2 } from '../../../../src/swagger/specGenerator2';
 import { Swagger } from '../../../../src/swagger/swagger';
 import { getDefaultOptions } from '../../../fixtures/defaultOptions';
 import { TestModel } from '../../../fixtures/testModel';
+import { ExtendedSwaggerConfig } from '../../../../src/cli';
 
 describe('Definition generation', () => {
   const metadata = new MetadataGenerator('./tests/fixtures/controllers/getController.ts').Generate();
   const dynamicMetadata = new MetadataGenerator('./tests/fixtures/controllers/getController.ts', undefined, undefined, ['./tests/fixtures/controllers/getController.ts']).Generate();
-  const defaultOptions = getDefaultOptions();
-  const optionsWithNoAdditional = Object.assign<{}, SwaggerConfig, Partial<SwaggerConfig>>({}, defaultOptions, {
+  const defaultConfig = getDefaultOptions();
+  const defaultOptions: ExtendedSwaggerConfig = { ...defaultConfig.swagger, entryFile: defaultConfig.entryFile, noImplicitAdditionalProperties: 'ignore' };
+  const optionsWithNoAdditional = Object.assign<{}, ExtendedSwaggerConfig, Partial<ExtendedSwaggerConfig>>({}, defaultOptions, {
     noImplicitAdditionalProperties: 'silently-remove-extras',
   });
 
@@ -298,6 +299,15 @@ describe('Definition generation', () => {
             const expectedEnumValues = ['', 'VALUE_1', 'VALUE_2'];
             expect(validatedDefinition.enum).to.eql(expectedEnumValues, `for property ${propertyName}[enum]`);
           },
+          enumStringProperty: (propertyName, propertySchema) => {
+            expect(propertySchema.$ref).to.eq('#/definitions/EnumStringValue.VALUE_1');
+            const schema = getValidatedDefinition('EnumStringValue.VALUE_1', currentSpec);
+            expect(schema).to.deep.eq({
+              description: undefined,
+              enum: ['VALUE_1'],
+              type: 'string',
+            });
+          },
           enumStringArray: (propertyName, propertySchema) => {
             expect(propertySchema.type).to.eq('array', `for property ${propertyName}.type`);
             expect(propertySchema.description).to.eq(undefined, `for property ${propertyName}.description`);
@@ -380,12 +390,12 @@ describe('Definition generation', () => {
             expect(propertySchema).to.not.haveOwnProperty('format', `for property ${propertyName}`);
           },
           anyType: (propertyName, propertySchema) => {
-            expect(propertySchema.type).to.eq('object', `for property ${propertyName}`);
+            expect(propertySchema.type).to.eq(undefined, `for property ${propertyName}`);
             expect(propertySchema['x-nullable']).to.eq(undefined, `for property ${propertyName}[x-nullable]`);
             expect(propertySchema.additionalProperties).to.eq(true, 'because the "unknown" type always allows more properties be definition');
           },
           unknownType: (propertyName, propertySchema) => {
-            expect(propertySchema.type).to.eq('object', `for property ${propertyName}`);
+            expect(propertySchema.type).to.eq(undefined, `for property ${propertyName}`);
             expect(propertySchema['x-nullable']).to.eq(undefined, `for property ${propertyName}[x-nullable]`);
             expect(propertySchema.additionalProperties).to.eq(true, 'because the "any" type always allows more properties be definition');
           },
@@ -1042,6 +1052,13 @@ describe('Definition generation', () => {
 
       it('should not generate a property for a non-public property', () => {
         const propertyName = 'protectedStringProperty';
+        if (properties[propertyName]) {
+          throw new Error(`Property '${propertyName}' was not expected to exist.`);
+        }
+      });
+
+      it('should not generate a property for a static property', () => {
+        const propertyName = 'staticStringProperty';
         if (properties[propertyName]) {
           throw new Error(`Property '${propertyName}' was not expected to exist.`);
         }

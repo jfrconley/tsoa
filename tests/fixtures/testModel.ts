@@ -48,6 +48,7 @@ export interface TestModel extends Model {
   enumStringNumberArray?: EnumStringNumberValue[];
   enumNumberArray?: EnumNumberValue[];
   enumStringValue?: EnumStringValue;
+  enumStringProperty?: EnumStringValue.VALUE_1;
   enumStringArray?: EnumStringValue[];
   modelValue: TestSubModel;
   modelsArray: TestSubModel[];
@@ -599,7 +600,7 @@ export class TestClassModel extends TestClassBaseModel {
   /* tslint:disable-next-line */
   stringProperty: string;
   protected protectedStringProperty: string;
-
+  public static staticStringProperty: string;
   /**
    * @param publicConstructorVar This is a description for publicConstructorVar
    */
