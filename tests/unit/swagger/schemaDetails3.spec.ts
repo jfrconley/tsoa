@@ -525,11 +525,7 @@ describe('Definition generation for OpenAPI 3.0.0', () => {
 
             const componentSchema = getComponentSchema('StrLiteral', currentSpec);
             expect(componentSchema).to.deep.eq({
-              oneOf: [
-                { type: 'string', enum: [''], nullable: false },
-                { type: 'string', enum: ['Foo'], nullable: false },
-                { type: 'string', enum: ['Bar'], nullable: false },
-              ],
+              oneOf: [{ type: 'string', enum: [''], nullable: false }, { type: 'string', enum: ['Foo'], nullable: false }, { type: 'string', enum: ['Bar'], nullable: false }],
               default: undefined,
               description: undefined,
               example: undefined,
@@ -589,6 +585,12 @@ describe('Definition generation for OpenAPI 3.0.0', () => {
             expect(propertySchema.type).to.eq(undefined, `for property ${propertyName}`);
             expect(propertySchema.nullable).to.eq(undefined, `for property ${propertyName}.nullable`);
             expect(propertySchema.additionalProperties).to.eq(true, 'because the "unknown" type always allows more properties be definition');
+          },
+          genericTypeObject: (propertyName, propertySchema) => {
+            expect(propertySchema.$ref).to.eq('#/components/schemas/Generic__foo-string--bar-boolean__');
+          },
+          indexed: (propertyName, propertySchema) => {
+            expect(propertySchema.$ref).to.eq('#/components/schemas/Partial_Indexed~foo~_');
           },
           modelsObjectIndirect: (propertyName, propertySchema) => {
             expect(propertySchema.$ref).to.eq('#/components/schemas/TestSubModelContainer', `for property ${propertyName}.$ref`);
@@ -806,7 +808,12 @@ describe('Definition generation for OpenAPI 3.0.0', () => {
                   partial: { $ref: '#/components/schemas/Partial_Account_', description: undefined, format: undefined, example: undefined },
                   excludeToEnum: { $ref: '#/components/schemas/Exclude_EnumUnion.EnumNumberValue_', description: undefined, format: undefined, example: undefined },
                   excludeToAlias: { $ref: '#/components/schemas/Exclude_ThreeOrFour.TypeAliasModel3_', description: undefined, format: undefined, example: undefined },
-                  excludeLiteral: { $ref: '#/components/schemas/Exclude_keyofTestClassModel.account~OR~defaultValue2_', description: undefined, format: undefined, example: undefined },
+                  excludeLiteral: {
+                    $ref: '#/components/schemas/Exclude_keyofTestClassModel.account~OR~defaultValue2~OR~indexedTypeToInterface~OR~indexedTypeToClass~OR~indexedTypeToAlias_',
+                    description: undefined,
+                    format: undefined,
+                    example: undefined,
+                  },
                   excludeToInterface: { $ref: '#/components/schemas/Exclude_OneOrTwo.TypeAliasModel1_', description: undefined, format: undefined, example: undefined },
                   excludeTypeToPrimitive: { $ref: '#/components/schemas/NonNullable_number~OR~null_', description: undefined, format: undefined, example: undefined },
                   pick: { $ref: '#/components/schemas/Pick_ThingContainerWithTitle_string_.list_', description: undefined, format: undefined, example: undefined },
@@ -822,6 +829,98 @@ describe('Definition generation for OpenAPI 3.0.0', () => {
               },
               `for property ${propertyName}`,
             );
+
+            const getterClass = getComponentSchema('GetterClass', currentSpec);
+            expect(getterClass).to.deep.eq({
+              allOf: [
+                {
+                  $ref: '#/components/schemas/NonFunctionProperties_GetterClass_',
+                },
+                {
+                  properties: {
+                    foo: {
+                      type: 'string',
+                      description: undefined,
+                      example: undefined,
+                      format: undefined,
+                      default: undefined,
+                    },
+                  },
+                  required: ['foo'],
+                  type: 'object',
+                },
+              ],
+              default: undefined,
+              example: undefined,
+              format: undefined,
+              description: undefined,
+            });
+            const getterClass2 = getComponentSchema('NonFunctionProperties_GetterClass_', currentSpec);
+            expect(getterClass2).to.deep.eq({
+              $ref: '#/components/schemas/Pick_GetterClass.NonFunctionPropertyNames_GetterClass__',
+              description: undefined,
+              example: undefined,
+              format: undefined,
+              default: undefined,
+            });
+            const getterClass3 = getComponentSchema('Pick_GetterClass.NonFunctionPropertyNames_GetterClass__', currentSpec);
+            expect(getterClass3).to.deep.eq({
+              default: undefined,
+              description: 'From T, pick a set of properties whose keys are in the union K',
+              example: undefined,
+              format: undefined,
+              properties: {
+                a: {
+                  type: 'string',
+                  enum: ['b'],
+                  nullable: false,
+                  description: undefined,
+                  example: undefined,
+                  format: undefined,
+                  default: undefined,
+                },
+              },
+              required: ['a'],
+              type: 'object',
+            });
+
+            const getterInterface = getComponentSchema('GetterInterface', currentSpec);
+            expect(getterInterface).to.deep.eq({
+              properties: {
+                foo: {
+                  type: 'string',
+                  description: undefined,
+                  example: undefined,
+                  format: undefined,
+                  default: undefined,
+                },
+              },
+              required: ['foo'],
+              type: 'object',
+              default: undefined,
+              example: undefined,
+              format: undefined,
+              description: undefined,
+            });
+
+            const getterInterfaceHerited = getComponentSchema('GetterInterfaceHerited', currentSpec);
+            expect(getterInterfaceHerited).to.deep.eq({
+              properties: {
+                foo: {
+                  type: 'string',
+                  description: undefined,
+                  example: undefined,
+                  format: undefined,
+                  default: undefined,
+                },
+              },
+              required: ['foo'],
+              type: 'object',
+              default: undefined,
+              example: undefined,
+              format: undefined,
+              description: undefined,
+            });
 
             const omit = getComponentSchema('Omit_ErrorResponseModel.status_', currentSpec);
             expect(omit).to.deep.eq(
@@ -929,13 +1028,14 @@ describe('Definition generation for OpenAPI 3.0.0', () => {
               `for a schema linked by property ${propertyName}`,
             );
 
-            const excludeLiteral = getComponentSchema('Exclude_keyofTestClassModel.account~OR~defaultValue2_', currentSpec);
+            const excludeLiteral = getComponentSchema('Exclude_keyofTestClassModel.account~OR~defaultValue2~OR~indexedTypeToInterface~OR~indexedTypeToClass~OR~indexedTypeToAlias_', currentSpec);
             expect(excludeLiteral).to.deep.eq(
               {
                 oneOf: [
                   { type: 'string', enum: ['id'], nullable: false },
                   { type: 'string', enum: ['enumKeys'], nullable: false },
                   { type: 'string', enum: ['keyInterface'], nullable: false },
+                  { type: 'string', enum: ['indexedType'], nullable: false },
                   { type: 'string', enum: ['publicStringProperty'], nullable: false },
                   { type: 'string', enum: ['optionalPublicStringProperty'], nullable: false },
                   { type: 'string', enum: ['emailPattern'], nullable: false },
@@ -943,6 +1043,7 @@ describe('Definition generation for OpenAPI 3.0.0', () => {
                   { type: 'string', enum: ['publicConstructorVar'], nullable: false },
                   { type: 'string', enum: ['readonlyConstructorArgument'], nullable: false },
                   { type: 'string', enum: ['optionalPublicConstructorVar'], nullable: false },
+                  { type: 'string', enum: ['myIgnoredMethod'], nullable: false },
                   { type: 'string', enum: ['defaultValue1'], nullable: false },
                 ],
                 description: 'Exclude from T those types that are assignable to U',
@@ -1013,6 +1114,10 @@ describe('Definition generation for OpenAPI 3.0.0', () => {
                     oneOf: [{ enum: ['OK'], nullable: false, type: 'string' }, { enum: ['KO'], nullable: false, type: 'string' }],
                   },
                   id: { type: 'number', format: 'double', default: undefined, description: undefined, example: undefined },
+                  indexedType: { type: 'string', default: undefined, description: undefined, format: undefined, example: undefined },
+                  indexedTypeToClass: { $ref: '#/components/schemas/IndexedClass', description: undefined, format: undefined, example: undefined },
+                  indexedTypeToInterface: { $ref: '#/components/schemas/IndexedInterface', description: undefined, format: undefined, example: undefined },
+                  indexedTypeToAlias: { $ref: '#/components/schemas/IndexedInterfaceAlias', description: undefined, format: undefined, example: undefined },
                   keyInterface: { type: 'string', default: undefined, description: undefined, format: undefined, example: undefined, enum: ['id'], nullable: false },
                   optionalPublicConstructorVar: { type: 'string', default: undefined, description: undefined, format: undefined, example: undefined },
                   readonlyConstructorArgument: { type: 'string', default: undefined, description: undefined, format: undefined, example: undefined },
@@ -1089,10 +1194,7 @@ describe('Definition generation for OpenAPI 3.0.0', () => {
                 maybeString: { $ref: '#/components/schemas/Maybe_string_', description: undefined, format: undefined, example: undefined },
                 wordOrNull: { $ref: '#/components/schemas/Maybe_Word_', description: undefined, format: undefined, example: undefined },
                 numberOrNull: {
-                  oneOf: [
-                    { type: 'number', format: 'double' },
-                    { type: 'number', enum: ['null'], nullable: true },
-                  ],
+                  oneOf: [{ type: 'number', format: 'double' }, { type: 'number', enum: ['null'], nullable: true }],
                   description: undefined,
                   format: undefined,
                   default: undefined,
@@ -1184,10 +1286,7 @@ describe('Definition generation for OpenAPI 3.0.0', () => {
       // Assert
       expect(getComponentSchema(schemaName, { specName: 'specDefault', spec })).to.deep.eq({
         description: undefined,
-        oneOf: [
-          { type: 'number', enum: [1, 3] },
-          { type: 'string', enum: ['two', 'four'] },
-        ],
+        oneOf: [{ type: 'number', enum: [1, 3] }, { type: 'string', enum: ['two', 'four'] }],
       });
     });
   });

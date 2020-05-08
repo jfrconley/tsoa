@@ -144,7 +144,7 @@ export class TypeResolver {
     if (ts.isMappedTypeNode(this.typeNode) && this.referencer) {
       const isNotIgnored = (e: ts.Declaration) => {
         const ignore = isExistJSDocTag(e, tag => tag.tagName.text === 'ignore');
-        return !ignore;
+        return !ignore && (ts.isPropertyDeclaration(e) || ts.isPropertySignature(e) || ts.isParameter(e));
       };
 
       const type = this.current.typeChecker.getTypeFromTypeNode(this.referencer);
@@ -215,6 +215,22 @@ export class TypeResolver {
         const indexedTypeName = this.current.typeChecker.typeToString(this.current.typeChecker.getTypeFromTypeNode(this.typeNode.type));
         throw new GenerateMetadataError(`Could not determine the keys on ${indexedTypeName}`, this.typeNode);
       }
+    }
+
+    if (
+      ts.isIndexedAccessTypeNode(this.typeNode) &&
+      ts.isLiteralTypeNode(this.typeNode.indexType) &&
+      (ts.isStringLiteral(this.typeNode.indexType.literal) || ts.isNumericLiteral(this.typeNode.indexType.literal))
+    ) {
+      const hasType = (node: ts.Node): node is ts.HasType => node.hasOwnProperty('type');
+      const symbol = this.current.typeChecker.getPropertyOfType(this.current.typeChecker.getTypeFromTypeNode(this.typeNode.objectType), this.typeNode.indexType.literal.text);
+      if (symbol === undefined || !hasType(symbol.valueDeclaration) || !symbol.valueDeclaration.type) {
+        throw new GenerateMetadataError(
+          `Could not determine the keys on ${this.current.typeChecker.typeToString(this.current.typeChecker.getTypeFromTypeNode(this.typeNode.objectType))}`,
+          this.typeNode,
+        );
+      }
+      return new TypeResolver(symbol.valueDeclaration.type, this.current, this.typeNode, this.context, this.referencer).resolve();
     }
 
     if (this.typeNode.kind !== ts.SyntaxKind.TypeReference) {
@@ -461,15 +477,42 @@ export class TypeResolver {
   }
 
   private getModelReference(modelType: ts.InterfaceDeclaration | ts.ClassDeclaration, name: string) {
+    const example = this.getNodeExample(modelType);
+    const description = this.getNodeDescription(modelType);
+
+    // Handle toJSON methods
+    if (!modelType.name) {
+      throw new GenerateMetadataError("Can't get Symbol from anonymous class", modelType);
+    }
+    const type = this.current.typeChecker.getTypeAtLocation(modelType.name);
+    const toJSON = this.current.typeChecker.getPropertyOfType(type, 'toJSON');
+    if (toJSON && toJSON.valueDeclaration && (ts.isMethodDeclaration(toJSON.valueDeclaration) || ts.isMethodSignature(toJSON.valueDeclaration))) {
+      let nodeType = toJSON.valueDeclaration.type;
+      if (!nodeType) {
+        const signature = this.current.typeChecker.getSignatureFromDeclaration(toJSON.valueDeclaration);
+        const implicitType = this.current.typeChecker.getReturnTypeOfSignature(signature!);
+        nodeType = this.current.typeChecker.typeToTypeNode(implicitType) as ts.TypeNode;
+      }
+      const type = new TypeResolver(nodeType, this.current).resolve();
+      const referenceType: Tsoa.ReferenceType = {
+        refName: this.getRefTypeName(name),
+        dataType: 'refAlias',
+        description,
+        type,
+        validators: {},
+        ...(example && { example }),
+      };
+      return referenceType;
+    }
+
     const properties = this.getModelProperties(modelType);
     const additionalProperties = this.getModelAdditionalProperties(modelType);
     const inheritedProperties = this.getModelInheritedProperties(modelType) || [];
-    const example = this.getNodeExample(modelType);
 
     const referenceType: Tsoa.ReferenceType = {
       additionalProperties,
       dataType: 'refObject',
-      description: this.getNodeDescription(modelType),
+      description,
       properties: inheritedProperties,
       refName: this.getRefTypeName(name),
       ...(example && { example }),
@@ -489,7 +532,11 @@ export class TypeResolver {
         .replace(/\'([^']*)\'|\"(^"*)\"/g, '$1')
         .replace(/&/g, '~AND~')
         .replace(/\|/g, '~OR~')
-        .replace(/\[\]/g, 'Array'),
+        .replace(/\[\]/g, 'Array')
+        .replace(/{|}/g, '_') // SuccessResponse_{indexesCreated-number}_ -> SuccessResponse__indexesCreated-number__
+        .replace(/([a-z]+):([a-z]+)/gi, '$1-$2') // SuccessResponse_indexesCreated:number_ -> SuccessResponse_indexesCreated-number_
+        .replace(/;/g, '--')
+        .replace(/([a-z]+)\[([a-z]+)\]/gi, '$1~$2~'), // Partial_SerializedDatasourceWithVersion[format]_ -> Partial_SerializedDatasourceWithVersion~format~_,
     );
   }
 

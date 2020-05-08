@@ -399,6 +399,12 @@ describe('Definition generation', () => {
             expect(propertySchema['x-nullable']).to.eq(undefined, `for property ${propertyName}[x-nullable]`);
             expect(propertySchema.additionalProperties).to.eq(true, 'because the "any" type always allows more properties be definition');
           },
+          genericTypeObject: (propertyName, propertySchema) => {
+            expect(propertySchema.$ref).to.eq('#/definitions/Generic__foo-string--bar-boolean__');
+          },
+          indexed: (propertyName, propertySchema) => {
+            expect(propertySchema.$ref).to.eq('#/definitions/Partial_Indexed~foo~_');
+          },
           modelsObjectIndirect: (propertyName, propertySchema) => {
             expect(propertySchema.$ref).to.eq('#/definitions/TestSubModelContainer', `for property ${propertyName}.$ref`);
             expect(propertySchema).to.not.haveOwnProperty('additionalProperties', `for property ${propertyName}`);
@@ -637,7 +643,12 @@ describe('Definition generation', () => {
                   partial: { $ref: '#/definitions/Partial_Account_', description: undefined, format: undefined, example: undefined },
                   excludeToEnum: { $ref: '#/definitions/Exclude_EnumUnion.EnumNumberValue_', description: undefined, format: undefined, example: undefined },
                   excludeToAlias: { $ref: '#/definitions/Exclude_ThreeOrFour.TypeAliasModel3_', description: undefined, format: undefined, example: undefined },
-                  excludeLiteral: { $ref: '#/definitions/Exclude_keyofTestClassModel.account~OR~defaultValue2_', description: undefined, format: undefined, example: undefined },
+                  excludeLiteral: {
+                    $ref: '#/definitions/Exclude_keyofTestClassModel.account~OR~defaultValue2~OR~indexedTypeToInterface~OR~indexedTypeToClass~OR~indexedTypeToAlias_',
+                    description: undefined,
+                    format: undefined,
+                    example: undefined,
+                  },
                   excludeToInterface: { $ref: '#/definitions/Exclude_OneOrTwo.TypeAliasModel1_', description: undefined, format: undefined, example: undefined },
                   excludeTypeToPrimitive: { $ref: '#/definitions/NonNullable_number~OR~null_', description: undefined, format: undefined, example: undefined },
                   pick: { $ref: '#/definitions/Pick_ThingContainerWithTitle_string_.list_', description: undefined, format: undefined, example: undefined },
@@ -760,7 +771,7 @@ describe('Definition generation', () => {
               `for definition linked by ${propertyName}`,
             );
 
-            const excludeLiteral = getValidatedDefinition('Exclude_keyofTestClassModel.account~OR~defaultValue2_', currentSpec);
+            const excludeLiteral = getValidatedDefinition('Exclude_keyofTestClassModel.account~OR~defaultValue2~OR~indexedTypeToInterface~OR~indexedTypeToClass~OR~indexedTypeToAlias_', currentSpec);
             expect(excludeLiteral).to.deep.eq(
               {
                 type: 'string',
@@ -768,6 +779,7 @@ describe('Definition generation', () => {
                   'id',
                   'enumKeys',
                   'keyInterface',
+                  'indexedType',
                   'publicStringProperty',
                   'optionalPublicStringProperty',
                   'emailPattern',
@@ -775,6 +787,7 @@ describe('Definition generation', () => {
                   'publicConstructorVar',
                   'readonlyConstructorArgument',
                   'optionalPublicConstructorVar',
+                  'myIgnoredMethod',
                   'defaultValue1',
                 ],
                 description: 'Exclude from T those types that are assignable to U',
@@ -840,6 +853,10 @@ describe('Definition generation', () => {
                   defaultValue1: { type: 'string', default: 'Default Value 1', description: undefined, format: undefined, example: undefined },
                   enumKeys: { type: 'string', default: undefined, description: undefined, format: undefined, example: undefined, enum: ['OK', 'KO'], 'x-nullable': false },
                   id: { type: 'number', format: 'double', default: undefined, description: undefined, example: undefined },
+                  indexedType: { type: 'string', default: undefined, description: undefined, format: undefined, example: undefined },
+                  indexedTypeToAlias: { $ref: '#/definitions/IndexedInterfaceAlias', description: undefined, format: undefined, example: undefined },
+                  indexedTypeToClass: { $ref: '#/definitions/IndexedClass', description: undefined, format: undefined, example: undefined },
+                  indexedTypeToInterface: { $ref: '#/definitions/IndexedInterface', description: undefined, format: undefined, example: undefined },
                   keyInterface: { type: 'string', default: undefined, description: undefined, format: undefined, example: undefined, 'x-nullable': false, enum: ['id'] },
                   optionalPublicConstructorVar: { type: 'string', default: undefined, description: undefined, format: undefined, example: undefined },
                   readonlyConstructorArgument: { type: 'string', default: undefined, description: undefined, format: undefined, example: undefined },
@@ -869,6 +886,44 @@ describe('Definition generation', () => {
               },
               `for definition linked by ${propertyName}`,
             );
+
+            const indexedTypeToClass = getValidatedDefinition('IndexedClass', currentSpec);
+            expect(indexedTypeToClass).to.deep.eq({
+              additionalProperties: currentSpec.specName === 'specWithNoImplicitExtras' || currentSpec.specName === 'dynamicSpecWithNoImplicitExtras' ? false : true,
+              description: undefined,
+              properties: {
+                foo: {
+                  default: undefined,
+                  description: undefined,
+                  enum: ['bar'],
+                  example: undefined,
+                  format: undefined,
+                  type: 'string',
+                  'x-nullable': false,
+                },
+              },
+              required: ['foo'],
+              type: 'object',
+            });
+
+            const indexedTypeToInterface = getValidatedDefinition('IndexedInterface', currentSpec);
+            expect(indexedTypeToInterface).to.deep.eq({
+              additionalProperties: currentSpec.specName === 'specWithNoImplicitExtras' || currentSpec.specName === 'dynamicSpecWithNoImplicitExtras' ? false : true,
+              description: undefined,
+              properties: {
+                foo: {
+                  default: undefined,
+                  description: undefined,
+                  enum: ['bar'],
+                  example: undefined,
+                  format: undefined,
+                  type: 'string',
+                  'x-nullable': false,
+                },
+              },
+              required: ['foo'],
+              type: 'object',
+            });
 
             const defaultArgs = getValidatedDefinition('DefaultTestModel', currentSpec);
             expect(defaultArgs).to.deep.eq(

@@ -60,6 +60,8 @@ export interface TestModel extends Model {
   optionalString?: string;
   anyType?: any;
   unknownType?: unknown;
+  genericTypeObject?: Generic<{ foo: string; bar: boolean }>;
+  indexed?: Partial<Indexed['foo']>;
   // modelsObjectDirect?: {[key: string]: TestSubModel2;};
   modelsObjectIndirect?: TestSubModelContainer;
   modelsObjectIndirectNS?: TestSubModelContainerNamespace.TestSubModelContainer;
@@ -92,7 +94,7 @@ export interface TestModel extends Model {
     partial?: Partial<Account>;
     excludeToEnum?: Exclude<EnumUnion, EnumNumberValue>;
     excludeToAlias?: Exclude<ThreeOrFour, TypeAliasModel3>;
-    excludeLiteral?: Exclude<keyof TestClassModel, 'account' | 'defaultValue2'>;
+    excludeLiteral?: Exclude<keyof TestClassModel, 'account' | 'defaultValue2' | 'indexedTypeToInterface' | 'indexedTypeToClass' | 'indexedTypeToAlias'>;
     excludeToInterface?: Exclude<OneOrTwo, TypeAliasModel1>;
     excludeTypeToPrimitive?: NonNullable<number | null>;
 
@@ -143,6 +145,16 @@ export interface TestModel extends Model {
     wordOrNull: Maybe<Word>;
     maybeString: Maybe<string>;
     justNull: null;
+  };
+}
+
+interface Generic<T> {
+  foo: T;
+}
+
+interface Indexed {
+  foo: {
+    bar: string;
   };
 }
 
@@ -570,6 +582,24 @@ enum MyEnum {
   KO,
 }
 
+interface IndexedInterface {
+  foo: 'bar';
+}
+type IndexedInterfaceAlias = IndexedInterface;
+class IndexedClass {
+  public foo: 'bar';
+}
+
+interface Indexed {
+  foo: {
+    bar: string;
+  };
+  interface: IndexedInterface;
+  alias: IndexedInterfaceAlias;
+  class: IndexedClass;
+}
+type IndexType = 'foo';
+
 /**
  * This is a description of TestClassModel
  */
@@ -578,6 +608,10 @@ export class TestClassModel extends TestClassBaseModel {
   public defaultValue2 = 'Default Value 2';
   public enumKeys: keyof typeof MyEnum;
   public keyInterface?: keyof Model;
+  public indexedType?: Indexed[IndexType]['bar'];
+  public indexedTypeToInterface?: Indexed['interface'];
+  public indexedTypeToClass?: Indexed['class'];
+  public indexedTypeToAlias?: Indexed['alias'];
   /**
    * This is a description of a public string property
    *
@@ -613,6 +647,48 @@ export class TestClassModel extends TestClassBaseModel {
   ) {
     super();
   }
+
+  public myIgnoredMethod() {
+    return 'ignored';
+  }
+}
+
+type NonFunctionPropertyNames<T> = {
+  [K in keyof T]: T[K] extends Function ? never : K;
+}[keyof T];
+type NonFunctionProperties<T> = Pick<T, NonFunctionPropertyNames<T>>;
+export class GetterClass {
+  public a: 'b';
+
+  get foo() {
+    return 'bar';
+  }
+
+  public toJSON(): NonFunctionProperties<GetterClass> & { foo: string } {
+    return Object.assign({}, this, { foo: this.foo });
+  }
+}
+
+export class SimpleClassWithToJSON {
+  public a: string;
+  public b: boolean;
+
+  constructor(a: string, b: boolean) {
+    this.a = a;
+    this.b = b;
+  }
+
+  public toJSON(): { a: string } {
+    return { a: this.a };
+  }
+}
+
+export interface GetterInterface {
+  toJSON(): { foo: string };
+}
+
+export interface GetterInterfaceHerited extends GetterInterface {
+  foo: number;
 }
 
 export interface GenericModel<T = string> {
